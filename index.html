@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏓 Ping Pong Game</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #1a1a1a, #2c3e50);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            background: #000;
+            border: 5px solid #ecf0f1;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            overflow: hidden;
+            max-width: 100vw;
+            max-height: 100vh;
+        }
+        #player, #ai {
+            position: absolute;
+            width: 10px;
+            height: 100px;
+            border-radius: 5px;
+            transition: top 0.05s linear;
+        }
+        #player {
+            left: 30px;
+            background: #3498db;
+        }
+        #ai {
+            right: 30px;
+            background: #e74c3c;
+        }
+        #ball {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background: #ecf0f1;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #fff;
+        }
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ecf0f1;
+            font-size: 24px;
+            text-shadow: 0 0 5px #00ffff;
+        }
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ecf0f1;
+            font-size: 36px;
+            text-align: center;
+            text-shadow: 0 0 10px #00ff00;
+            display: none;
+        }
+        #controls {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10; /* Ensure buttons are above game elements */
+        }
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            background: #3498db;
+            color: #ecf0f1;
+            border: none;
+            border-radius: 25px;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            touch-action: manipulation; /* Prevent scrolling on touch */
+        }
+        .control-btn:active {
+            background: #2980b9; /* Darker shade when pressed */
+        }
+        @media (max-width: 800px) {
+            #game-container {
+                width: 100vw;
+                height: 62.5vw;
+            }
+            #player, #ai {
+                height: 12.5vw;
+            }
+            #ball {
+                width: 1.875vw;
+                height: 1.875vw;
+            }
+            #score {
+                font-size: 3vw;
+            }
+            #message {
+                font-size: 4.5vw;
+            }
+            #controls {
+                left: 5px;
+                gap: 5px;
+            }
+            .control-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="player"></div>
+        <div id="ai"></div>
+        <div id="ball"></div>
+        <div id="score">Player: 0  AI: 0</div>
+        <div id="message"></div>
+        <div id="controls">
+            <button id="up-btn" class="control-btn">↑</button>
+            <button id="down-btn" class="control-btn">↓</button>
+        </div>
+    </div>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        const ai = document.getElementById('ai');
+        const ball = document.getElementById('ball');
+        const scoreDisplay = document.getElementById('score');
+        const message = document.getElementById('message');
+        const upBtn = document.getElementById('up-btn');
+        const downBtn = document.getElementById('down-btn');
+
+        let WIDTH = gameContainer.offsetWidth;
+        let HEIGHT = gameContainer.offsetHeight;
+        let playerY = HEIGHT / 2 - 50, aiY = HEIGHT / 2 - 50;
+        let ballX = WIDTH / 2, ballY = HEIGHT / 2;
+        let ballSpeedX = 4 * (Math.random() > 0.5 ? 1 : -1);
+        let ballSpeedY = 4 * (Math.random() > 0.5 ? 1 : -1);
+        let playerScore = 0, aiScore = 0;
+        const paddleSpeed = 3;
+        const ballSize = 15, paddleHeight = 100;
+        const winningScore = 5, aiMissChance = 0.15;
+
+        let moveUp = false, moveDown = false;
+
+        const scaleX = (x) => (x / 800) * WIDTH;
+        const scaleY = (y) => (y / 500) * HEIGHT;
+        const scaleSize = (size) => (size / 800) * WIDTH;
+
+        player.style.top = `${scaleY(playerY)}px`;
+        ai.style.top = `${scaleY(aiY)}px`;
+        ball.style.left = `${scaleX(ballX)}px`;
+        ball.style.top = `${scaleY(ballY)}px`;
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') moveUp = true;
+            if (e.key === 'ArrowDown') moveDown = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowUp') moveUp = false;
+            if (e.key === 'ArrowDown') moveDown = false;
+        });
+
+        // Touch controls (drag)
+        let touchY = null;
+        gameContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchY = e.touches[0].clientY;
+        });
+        gameContainer.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const newTouchY = e.touches[0].clientY;
+            const deltaY = (newTouchY - touchY) * (HEIGHT / window.innerHeight);
+            playerY += deltaY;
+            touchY = newTouchY;
+            if (playerY < 0) playerY = 0;
+            if (playerY > HEIGHT - paddleHeight) playerY = HEIGHT - paddleHeight;
+            player.style.top = `${scaleY(playerY)}px`;
+        });
+        gameContainer.addEventListener('touchend', () => {
+            touchY = null;
+        });
+
+        // Button controls for mobile
+        upBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            moveUp = true;
+        });
+        upBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            moveUp = false;
+        });
+        downBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            moveDown = true;
+        });
+        downBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            moveDown = false;
+        });
+
+        function update() {
+            // Player movement (keyboard or buttons)
+            if (moveUp && playerY > 0) {
+                playerY -= paddleSpeed;
+            }
+            if (moveDown && playerY < HEIGHT - paddleHeight) {
+                playerY += paddleSpeed;
+            }
+            player.style.top = `${scaleY(playerY)}px`;
+
+            // AI movement
+            if (Math.random() > aiMissChance) {
+                if (aiY + paddleHeight / 2 < ballY) aiY += paddleSpeed;
+                else if (aiY + paddleHeight / 2 > ballY) aiY -= paddleSpeed;
+                if (aiY < 0) aiY = 0;
+                if (aiY > HEIGHT - paddleHeight) aiY = HEIGHT - paddleHeight;
+                ai.style.top = `${scaleY(aiY)}px`;
+            }
+
+            // Ball movement
+            ballX += ballSpeedX;
+            ballY += ballSpeedY;
+            ball.style.left = `${scaleX(ballX)}px`;
+            ball.style.top = `${scaleY(ballY)}px`;
+
+            // Ball collision with top/bottom
+            if (ballY <= 0 || ballY >= HEIGHT - ballSize) ballSpeedY *= -1;
+
+            // Ball collision with paddles
+            if (
+                (ballX <= 40 && ballY > playerY && ballY < playerY + paddleHeight) ||
+                (ballX >= WIDTH - 40 - ballSize && ballY > aiY && ballY < aiY + paddleHeight)
+            ) {
+                ballSpeedX *= -1.05;
+            }
+
+            // Scoring
+            if (ballX <= 0) {
+                aiScore++;
+                resetBall();
+            }
+            if (ballX >= WIDTH) {
+                playerScore++;
+                resetBall();
+            }
+
+            scoreDisplay.textContent = `Player: ${playerScore}  AI: ${aiScore}`;
+
+            // Check win condition
+            if (playerScore === winningScore) {
+                message.textContent = '🎉 YOU WIN! 🎉';
+                message.style.display = 'block';
+                setTimeout(() => location.reload(), 3000);
+                return;
+            }
+            if (aiScore === winningScore) {
+                message.textContent = '💀 AI WINS! Try Again!';
+                message.style.display = 'block';
+                setTimeout(() => location.reload(), 3000);
+                return;
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        function resetBall() {
+            ballX = WIDTH / 2;
+            ballY = HEIGHT / 2;
+            ballSpeedX = 4 * (Math.random() > 0.5 ? 1 : -1);
+            ballSpeedY = 4 * (Math.random() > 0.5 ? 1 : -1);
+            ball.style.left = `${scaleX(ballX)}px`;
+            ball.style.top = `${scaleY(ballY)}px`;
+        }
+
+        // Adjust dimensions on window resize
+        window.addEventListener('resize', () => {
+            WIDTH = gameContainer.offsetWidth;
+            HEIGHT = gameContainer.offsetHeight;
+            player.style.top = `${scaleY(playerY)}px`;
+            ai.style.top = `${scaleY(aiY)}px`;
+            ball.style.left = `${scaleX(ballX)}px`;
+            ball.style.top = `${scaleY(ballY)}px`;
+        });
+
+        update();
+    </script>
+</body>
+</html>
